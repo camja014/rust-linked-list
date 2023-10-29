@@ -18,10 +18,6 @@ pub mod list {
         size: usize,
     }
 
-    struct ListIterator<'a: 'b, 'b> {
-        current: Option<Ref<'b, ListNode<'a>>>,
-    }
-
     impl<'a> ListNode<'a> {
         fn new(val: u32) -> ListNode<'a> {
             return ListNode {
@@ -68,15 +64,17 @@ pub mod list {
         }
 
         pub fn peek_front(&self) -> Option<Ref<u32>> {
-            return self.head.as_ref().map(|node: &NodeRef| {
-                return Ref::map(node.borrow(), |node: &ListNode| &node.val);
-            });
+            return match self.head.as_ref() {
+                None => None,
+                Some(v) => Some(Ref::map(v.borrow(), |node| &node.val)),
+            };
         }
 
         pub fn peek_back(&self) -> Option<Ref<u32>> {
-            return self.tail.as_ref().map(|node| {
-                return Ref::map(node.borrow(), |node: &ListNode| &node.val);
-            });
+            return match self.tail.as_ref() {
+                None => None,
+                Some(v) => Some(Ref::map(v.borrow(), |node| &node.val)),
+            };
         }
 
         pub fn pop_back(&mut self) {
@@ -106,17 +104,26 @@ pub mod list {
         }
     }
 
-    impl<'a, 'b> Iterator for ListIterator<'a, 'b> {
-        type Item = Ref<'b, u32>;
+    /// 'a: ListNode lifetime
+    /// 'b: Returned Ref lifetime
+    ///
+    /// Assert that 'a must be greater than 'b (i.e the list must outlive the iterator)
+    struct ListIterator<'a> {
+        current: Option<NodeRef<'a>>,
+    }
+
+    impl<'a> Iterator for ListIterator<'a> {
+        type Item = Ref<'a, u32>;
 
         fn next(&mut self) -> Option<Self::Item> {
-            return match &self.current {
+            let next = match self.current.as_ref() {
                 None => None,
-                Some(v) => match &v.next {
-                    None => None,
-                    Some(v) => Some(Ref::map(v.borrow(), |r| &r.val)),
-                },
+                Some(v) => v.borrow().next,
             };
+            self.current = next;
+
+            let cur_ref: Option<&'a NodeRef> = self.current.as_ref();
+            return cur_ref.map(|node| Ref::map(node.borrow(), |node_ref| &node_ref.val));
         }
     }
 
